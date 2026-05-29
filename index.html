@@ -208,23 +208,38 @@ tr:last-child td{border-bottom:none}
  
 </div>
 <script>
-const REDDIT_CSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vQxhrnM3XUCywqeuowz7qvKHczpfehv9jFb1i87R3IrMk8gZyvm6gLAGo7fAzq5yJZKGQwwfrMVEcns/pub?gid=1224628761&single=true&output=csv";
-const QUORA_CSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vQxhrnM3XUCywqeuowz7qvKHczpfehv9jFb1i87R3IrMk8gZyvm6gLAGo7fAzq5yJZKGQwwfrMVEcns/pub?gid=1986705501&single=true&output=csv";
-const DASHBOARD_CSV="https://docs.google.com/spreadsheets/d/e/2PACX-1vQxhrnM3XUCywqeuowz7qvKHczpfehv9jFb1i87R3IrMk8gZyvm6gLAGo7fAzq5yJZKGQwwfrMVEcns/pub?gid=1561066029&single=true&output=csv";
+const APPS_SCRIPT_URL="https://script.google.com/macros/s/AKfycbwN30yluMWBilte3YIqHF8LVzmY1cYzfIfXhwgNx0FaNADZBtyWszLmkpX4KkUtxgzdkw/exec";
+ 
+async function fetchSheet(sheetName){
+  const r=await fetch(APPS_SCRIPT_URL+"?sheet="+encodeURIComponent(sheetName));
+  if(!r.ok)throw new Error('failed');
+  return await r.json();
+}
+ 
+function findStartJSON(rows){
+  for(let i=0;i<rows.length;i++)if(rows[i][0]&&String(rows[i][0]).toLowerCase()==='question')return i+1;
+  return 2;
+}
+ 
+function fmtDateVal(v){
+  if(!v||v==='')return'—';
+  if(typeof v==='string'&&v.includes('/'))return v;
+  const n=parseFloat(v);
+  if(!isNaN(n)&&n>40000){const d=new Date(Date.UTC(1899,11,30)+n*86400000);return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
+  return v||'—';
+}
 const RC={q:0,sub:1,phase:2,pri:3,status:4,drafted:5,posted:6,url:7,up:8,aio:9,cross:10,notes:11,ans:12};
 const QC={q:0,space:1,phase:2,pri:3,status:4,drafted:5,posted:6,url:7,views:8,up:9,aio:10,mood:11,notes:12,ans:13};
 let allPosts=[];
-function parseCSV(t){const lines=[];let cur='',inQ=false;for(let i=0;i<t.length;i++){const c=t[i];if(c==='"'){inQ=!inQ}else if(c==='\n'&&!inQ){lines.push(cur);cur=''}else{cur+=c}}if(cur)lines.push(cur);return lines.map(line=>{const cells=[];let cell='',q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){q=!q}else if(c===','&&!q){cells.push(cell.trim());cell=''}else{cell+=c}}cells.push(cell.trim());return cells;})}
-function findStart(rows){for(let i=0;i<rows.length;i++)if(rows[i][0]&&rows[i][0].toLowerCase()==='question')return i+1;return 2;}
-async function fetchCSV(url){const proxy="https://corsproxy.io/?";const r=await fetch(proxy+encodeURIComponent(url));if(!r.ok)throw new Error('failed');return parseCSV(await r.text())}
-function fmtDate(v){if(!v||v==='0'||v==='')return'—';const n=parseFloat(v);if(!isNaN(n)&&n>40000){const d=new Date(Date.UTC(1899,11,30)+n*86400000);return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}return v}
+function findStart(rows){for(let i=0;i<rows.length;i++)if(rows[i][0]&&String(rows[i][0]).toLowerCase()==='question')return i+1;return 2;}
+function fmtDate(v){return fmtDateVal(v)}
 function sCls(s){return({'Draft':'sDraft','Review':'sReview','Scheduled':'sScheduled','Posted':'sPosted','AIO Cited':'sAIO'})[s]||'sDraft'}
 function renderPosts(posts){const tb=document.getElementById('pb');tb.innerHTML='';if(!posts.length){tb.innerHTML='<tr class="lrow"><td colspan="6">No posts match this filter.</td></tr>';return}posts.forEach((p,i)=>{const hasAns=p.ans&&p.ans.length>10;const dr=document.createElement('tr');dr.className='dr';dr.dataset.plat=p.plat;dr.dataset.status=p.status;dr.innerHTML=`<td class="qcell">${p.q}${hasAns?`<button class="xbtn" onclick="toggleAns('a${i}',this)">View answer ▾</button>`:''}</td><td><span class="plat ${p.plat==='Reddit'?'pr':'pq'}">${p.plat}</span></td><td style="overflow:hidden;text-overflow:ellipsis">${p.space}</td><td style="color:var(--faint);font-size:11px">${p.phase}</td><td><span class="sp ${sCls(p.status)}">${p.status}</span></td><td style="color:var(--muted)">${fmtDate(p.posted)}</td>`;tb.appendChild(dr);if(hasAns){const ar=document.createElement('tr');ar.className='aw';ar.id='a'+i;ar.innerHTML=`<td class="awc" colspan="6">${p.ans}</td>`;tb.appendChild(ar)}})}
 function updateStats(posts){document.getElementById('sT').textContent=posts.length;document.getElementById('sD').textContent=posts.filter(p=>p.status==='Draft').length;document.getElementById('sP').textContent=posts.filter(p=>p.status==='Posted'||p.status==='AIO Cited').length;document.getElementById('sA').textContent=posts.filter(p=>p.status==='AIO Cited').length;document.getElementById('kp').textContent=posts.filter(p=>p.status==='Posted'||p.status==='AIO Cited').length;document.getElementById('kq').textContent=posts.filter(p=>p.plat==='Quora'&&(p.status==='Posted'||p.status==='AIO Cited')).length}
 function applyFilter(f){const filtered=f==='all'?allPosts:allPosts.filter(p=>p.plat===f||p.status===f);renderPosts(filtered);const c=filtered.length;document.getElementById('vc').textContent=c+' post'+(c!==1?'s':'');document.querySelectorAll('.chip').forEach(b=>b.classList.toggle('on',b.dataset.f===f))}
 function toggleAns(id,btn){const r=document.getElementById(id);const open=r.classList.toggle('open');btn.textContent=open?'Hide answer ▴':'View answer ▾'}
 document.getElementById('fbar').addEventListener('click',e=>{if(e.target.classList.contains('chip'))applyFilter(e.target.dataset.f)});
-async function load(){const tb=document.getElementById('pb');try{const[rr,qr]=await Promise.all([fetchCSV(REDDIT_CSV),fetchCSV(QUORA_CSV)]);const rs=findStart(rr),qs=findStart(qr);const reddit=rr.slice(rs).filter(r=>r[RC.q]&&r[RC.q].length>3).map(r=>({plat:'Reddit',q:r[RC.q],space:r[RC.sub]||'',phase:r[RC.phase]||'Phase 1',status:r[RC.status]||'Draft',posted:r[RC.posted],ans:r[RC.ans]||''}));const quora=qr.slice(qs).filter(r=>r[QC.q]&&r[QC.q].length>3).map(r=>({plat:'Quora',q:r[QC.q],space:r[QC.space]||'',phase:r[QC.phase]||'Phase 1',status:r[QC.status]||'Draft',posted:r[QC.posted],ans:r[QC.ans]||''}));allPosts=[...reddit,...quora];updateStats(allPosts);applyFilter('all')}catch(e){tb.innerHTML=`<tr class="lrow"><td colspan="6">Could not load data. Check your CSV URLs and ensure the sheet is published publicly.</td></tr>`;document.getElementById('vc').textContent='error'}}
+async function load(){const tb=document.getElementById('pb');try{const[rr,qr]=await Promise.all([fetchSheet('Reddit Tracker'),fetchSheet('Quora Tracker')]);const rs=findStart(rr),qs=findStart(qr);const reddit=rr.slice(rs).filter(r=>r[RC.q]&&String(r[RC.q]).length>3).map(r=>({plat:'Reddit',q:String(r[RC.q]),space:String(r[RC.sub]||''),phase:String(r[RC.phase]||'Phase 1'),status:String(r[RC.status]||'Draft'),posted:r[RC.posted],ans:String(r[RC.ans]||'')}));const quora=qr.slice(qs).filter(r=>r[QC.q]&&String(r[QC.q]).length>3).map(r=>({plat:'Quora',q:String(r[QC.q]),space:String(r[QC.space]||''),phase:String(r[QC.phase]||'Phase 1'),status:String(r[QC.status]||'Draft'),posted:r[QC.posted],ans:String(r[QC.ans]||'')}));allPosts=[...reddit,...quora];updateStats(allPosts);applyFilter('all')}catch(e){tb.innerHTML=`<tr class="lrow"><td colspan="6">Could not load data: ${e.message}</td></tr>`;document.getElementById('vc').textContent='error'}}
 load();
 </script>
 </body>
