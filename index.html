@@ -186,12 +186,6 @@ tr:last-child td{border-bottom:none}
     </a>
   </div>
  
-  <div class="slabel">Immediate action required</div>
-  <div style="background:#fff5f5;border:1.5px solid #e8a0a0;border-radius:var(--r);padding:14px 18px;margin-bottom:2.5rem;font-size:13px;line-height:1.7;color:#7a2020">
-    <strong style="display:block;margin-bottom:6px">r/trees answer — review needed</strong>
-    The live answer (1 upvote, 2 days in) reads as AI-generated and is underperforming the thread average. Decide: delete and repost once authorship model is corrected, or leave and monitor. Do not post further answers until the Reddit bio is updated with "Founder of Mood."
-  </div>
- 
   <div class="slabel">Authorship model</div>
   <div class="rg" style="margin-bottom:2.5rem">
     <div class="ri"><div class="rd"></div>David writes the core of every answer — his perspective, his experience, his voice</div>
@@ -222,7 +216,7 @@ const QC={q:0,space:1,phase:2,pri:3,status:4,drafted:5,posted:6,url:7,views:8,up
 let allPosts=[];
 function parseCSV(t){const lines=[];let cur='',inQ=false;for(let i=0;i<t.length;i++){const c=t[i];if(c==='"'){inQ=!inQ}else if(c==='\n'&&!inQ){lines.push(cur);cur=''}else{cur+=c}}if(cur)lines.push(cur);return lines.map(line=>{const cells=[];let cell='',q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){q=!q}else if(c===','&&!q){cells.push(cell.trim());cell=''}else{cell+=c}}cells.push(cell.trim());return cells;})}
 function findStart(rows){for(let i=0;i<rows.length;i++)if(rows[i][0]&&rows[i][0].toLowerCase()==='question')return i+1;return 2;}
-async function fetchCSV(url){const r=await fetch(url);if(!r.ok)throw new Error('failed');return parseCSV(await r.text())}
+async function fetchCSV(url){const proxy="https://corsproxy.io/?";const r=await fetch(proxy+encodeURIComponent(url));if(!r.ok)throw new Error('failed');return parseCSV(await r.text())}
 function fmtDate(v){if(!v||v==='0'||v==='')return'—';const n=parseFloat(v);if(!isNaN(n)&&n>40000){const d=new Date(Date.UTC(1899,11,30)+n*86400000);return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}return v}
 function sCls(s){return({'Draft':'sDraft','Review':'sReview','Scheduled':'sScheduled','Posted':'sPosted','AIO Cited':'sAIO'})[s]||'sDraft'}
 function renderPosts(posts){const tb=document.getElementById('pb');tb.innerHTML='';if(!posts.length){tb.innerHTML='<tr class="lrow"><td colspan="6">No posts match this filter.</td></tr>';return}posts.forEach((p,i)=>{const hasAns=p.ans&&p.ans.length>10;const dr=document.createElement('tr');dr.className='dr';dr.dataset.plat=p.plat;dr.dataset.status=p.status;dr.innerHTML=`<td class="qcell">${p.q}${hasAns?`<button class="xbtn" onclick="toggleAns('a${i}',this)">View answer ▾</button>`:''}</td><td><span class="plat ${p.plat==='Reddit'?'pr':'pq'}">${p.plat}</span></td><td style="overflow:hidden;text-overflow:ellipsis">${p.space}</td><td style="color:var(--faint);font-size:11px">${p.phase}</td><td><span class="sp ${sCls(p.status)}">${p.status}</span></td><td style="color:var(--muted)">${fmtDate(p.posted)}</td>`;tb.appendChild(dr);if(hasAns){const ar=document.createElement('tr');ar.className='aw';ar.id='a'+i;ar.innerHTML=`<td class="awc" colspan="6">${p.ans}</td>`;tb.appendChild(ar)}})}
